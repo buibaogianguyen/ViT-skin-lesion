@@ -2,6 +2,9 @@ import sqlalchemy
 from sqlalchemy import create_engine, Column, String, Float, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from data_downloader import download_dataset
+import os
+import pandas as pd
 
 Base = declarative_base()
 
@@ -25,3 +28,32 @@ def init_db(db_path='sqlite:///skin_lesions.db'):
     Base.metadata.create_all(engine)
 
     return sessionmaker(bind=engine)()
+
+def load_metadata(db_session):
+    dataset_path = download_dataset()
+    metadata_path = os.path.join(dataset_path, 'HAM10000_metadata.csv')
+
+    if not os.path.exists(metadata_path):
+        raise FileNotFoundError(f"Metadata file not found at {metadata_path}. Run download_dataset.py or recheck for missing files/file corruptions.")
+    
+    df = pd.read_csv(metadata_path)
+    
+    if 'image_id' not in df.columns:
+        raise ValueError("Metadata CSV file is missing required column: image_id")
+    
+    if 'dx' not in df.columns:
+        raise ValueError("Metadata CSV file is missing required column: dx")
+    
+    for _, row in df.iterrows():
+        lesion = SkinLesion(
+            image_id = row['image_id'],
+            label = row['dx'],
+            age = int(row['age']) if pd.notna(row['age']) else None,
+            sex = row['sex'] if pd.notna(row['sex']) else None,
+            localization = row['localization'] if pd.notna(row['localization']) else None
+        )
+        db_session.merge(lesion)
+
+    db_session.commit()
+    
+    return dataset_path
