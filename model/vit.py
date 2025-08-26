@@ -22,6 +22,6 @@ class VisionTransformer(nn.Module):
                     nn.Linear(mlp_dim, hidden_dim)
                 ),
                 'norm2': nn.LayerNorm(hidden_dim)
-            })
+            }) for _ in range(depth)
         ])
 
