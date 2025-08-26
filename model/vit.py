@@ -25,3 +25,8 @@ class VisionTransformer(nn.Module):
             }) for _ in range(depth)
         ])
 
+        self.mlp_head = nn.Sequential(
+            nn.LayerNorm(hidden_dim),
+            nn.Linear(hidden_dim, num_classes) # to logits vector
+        )
+
