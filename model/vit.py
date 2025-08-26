@@ -30,3 +30,26 @@ class VisionTransformer(nn.Module):
             nn.Linear(hidden_dim, num_classes) # to logits vector
         )
 
+    def forward(self, x):
+        B = x.shape[0]
+        x = x.unfold(2,16,16).unfold(3,16,16)
+        x = x.permute(0, 2, 3, 1, 4, 5).reshape(B, -1, 16*16*3)
+        x = self.path_embed(x)
+
+        cls_tokens = self.cls_token.repeat(B, 1, 1)
+
+        x = torch.cat([cls_tokens, x], dim=1)
+
+        x += self.pos_embed
+
+        for layer in self.transformer:
+               residual = x
+               x = layer['norm1'](x)
+               attn_output, _ = layer['attn'](x, x, x)
+               x = residual + attn_output
+               residual = x
+               x = layer['norm2'](x)
+               x = residual + layer['mlp'](x)
+        x = self.mlp_head(x[:, 0])
+
+        return x
