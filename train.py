@@ -16,6 +16,22 @@ def train_model(model, train_loader, device, epochs=10, lr=0.001):
     for epoch in range(epochs):
         model.train()
 
+        train_loss = 0
+        
+        for (images, labels) in range(train_loader):
+            images, labels = images.to(device), labels.to(device)
+
+            optimizer.zero_grad()
+
+            outputs = model(images)
+
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            train_loss += loss.item()
+
+        print(f'Epoch {epoch+1}\nAvg Train Loss: {train_loss/len(train_loader):.4f}')
     
 if __name__ == '__main__':
     transform = transforms.Compose([
