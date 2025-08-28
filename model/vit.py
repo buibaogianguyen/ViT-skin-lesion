@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class VisionTransformer(nn.Module):
-    def __init__(self, img_shape, num_channels, patch_size, depth, hidden_dim, num_heads, mlp_dim, num_classes):
+    def __init__(self, img_shape, patch_size, depth, hidden_dim, num_heads, mlp_dim, num_classes):
         super(VisionTransformer, self).__init__()
 
         num_patches = (img_shape // patch_size) ** 2
