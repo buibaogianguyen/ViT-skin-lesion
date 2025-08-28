@@ -8,6 +8,7 @@ from data.data_manager import load_metadata, init_db
 from model.vit import VisionTransformer
 import os
 import json
+import numpy as np
 
 BEST_VAL_ACC_PATH = 'best_acc.json'
 
@@ -23,8 +24,12 @@ def load_best_acc():
     return 0
 
 
-def train_model(model, train_loader, val_loader, device, epochs=10, lr=0.001):
-    criterion = nn.CrossEntropyLoss()
+def train_model(model, train_loader, val_loader, train_labels, device, epochs=10, lr=0.001):
+    class_counts = np.bincount(train_labels)
+    class_weights = 1.0 / class_counts
+    weights = torch.tensor(class_weights, dtype=torch.float).to(device)
+
+    criterion = nn.CrossEntropyLoss(weights)
     optimizer = optim.AdamW(model.parameters(), lr=lr)
     
     model.to(device)
@@ -34,7 +39,7 @@ def train_model(model, train_loader, val_loader, device, epochs=10, lr=0.001):
     if os.path.exists('vit.pth'):
         model.load_state_dict(torch.load('vit.pth'))
     else:
-        print(f"Path 'vit.pth' does not exist")
+        print(f"Path 'vit.pth' does not exist yet")
 
     for epoch in range(epochs):
         model.train()
@@ -90,7 +95,7 @@ def validate(model, val_loader, device):
     
 if __name__ == '__main__':
     transform = transforms.Compose([
-        transforms.Resize(224,224),
+        transforms.Resize((224,224)),
         transforms.RandomHorizontalFlip(p=0.3),
         transforms.RandomRotation(10),
         transforms.ColorJitter(0.1, 0.1, 0.1, 0.02),
@@ -112,13 +117,18 @@ if __name__ == '__main__':
 
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
+    train_labels = [label for _, label in train_dataset]
+    val_labels = [label for _, label in val_dataset]
+    #print("Train class distribution:", np.bincount(train_labels))
+    #print("Val class distribution:", np.bincount(val_labels))
+
     train_loader = DataLoader(train_dataset, batch_size, shuffle=True, num_workers=2)
     val_loader = DataLoader(val_dataset, batch_size, num_workers=2)
 
     model = VisionTransformer(img_shape=224, patch_size=16, depth=12, hidden_dim=768, num_heads=12, mlp_dim=3072,num_classes=7)
 
     try:
-        train_model(model, train_loader, val_loader)
+        train_model(model, train_loader, val_loader, train_labels, device)
     except Exception as e:
         print(f"Training error: {e}")
 

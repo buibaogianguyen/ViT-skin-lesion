@@ -16,7 +16,7 @@ class VisionTransformer(nn.Module):
             nn.ModuleDict({
                 'attn': nn.MultiheadAttention(hidden_dim, num_heads=num_heads),
                 'norm1': nn.LayerNorm(hidden_dim),
-                'mlp':  nn.Sequantial(
+                'mlp':  nn.Sequential(
                     nn.Linear(hidden_dim, mlp_dim),
                     nn.GELU(),
                     nn.Linear(mlp_dim, hidden_dim)
@@ -34,7 +34,7 @@ class VisionTransformer(nn.Module):
         B = x.shape[0]
         x = x.unfold(2,16,16).unfold(3,16,16)
         x = x.permute(0, 2, 3, 1, 4, 5).reshape(B, -1, 16*16*3)
-        x = self.path_embed(x)
+        x = self.patch_embed(x)
 
         cls_tokens = self.cls_token.repeat(B, 1, 1)
 

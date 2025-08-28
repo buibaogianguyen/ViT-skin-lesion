@@ -2,7 +2,7 @@ import sqlalchemy
 from sqlalchemy import create_engine, Column, String, Float, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from data_downloader import download_dataset
+from data.data_downloader import download_dataset
 import os
 import pandas as pd
 

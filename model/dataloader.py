@@ -36,13 +36,13 @@ class HAM10000(Dataset):
         img_path = None
 
         for img_dir in self.img_dirs:
-            test_path = os.path.join(img_dir, f"{img_id}.png")
+            test_path = os.path.join(img_dir, f"{img_id}.jpg")
             if os.path.exists(test_path):
                 img_path = test_path
                 break
         
         if not img_path:
-             raise FileNotFoundError(f"Image {img_id}.png was not found in directory {self.img_dirs}")
+             raise FileNotFoundError(f"Image {img_id}.jpg was not found in directory {self.img_dirs}")
         
         image = Image.open(img_path).convert('RGB')
 
