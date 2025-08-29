@@ -9,6 +9,7 @@ from model.vit import VisionTransformer
 import os
 import json
 import numpy as np
+from torch.utils.data import WeightedRandomSampler
 
 BEST_VAL_ACC_PATH = 'best_acc.json'
 
@@ -24,12 +25,9 @@ def load_best_acc():
     return 0
 
 
-def train_model(model, train_loader, val_loader, train_labels, device, epochs=10, lr=0.001):
-    class_counts = np.bincount(train_labels)
-    class_weights = 1.0 / class_counts
-    weights = torch.tensor(class_weights, dtype=torch.float).to(device)
+def train_model(model, train_loader, val_loader, device, epochs=10, lr=0.0003):
 
-    criterion = nn.CrossEntropyLoss(weights)
+    criterion = nn.CrossEntropyLoss()
     optimizer = optim.AdamW(model.parameters(), lr=lr)
     
     model.to(device)
@@ -96,11 +94,12 @@ def validate(model, val_loader, device):
 if __name__ == '__main__':
     transform = transforms.Compose([
         transforms.Resize((224,224)),
-        transforms.RandomHorizontalFlip(p=0.3),
+        transforms.RandomHorizontalFlip(p=0.25),
+        transforms.RandomVerticalFlip(p=0.25),
         transforms.RandomRotation(10),
         transforms.ColorJitter(0.1, 0.1, 0.1, 0.02),
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     ])
 
     batch_size = 32
@@ -122,13 +121,19 @@ if __name__ == '__main__':
     #print("Train class distribution:", np.bincount(train_labels))
     #print("Val class distribution:", np.bincount(val_labels))
 
-    train_loader = DataLoader(train_dataset, batch_size, shuffle=True, num_workers=2)
+    class_counts = np.bincount(train_labels)
+    class_weights = 1.0 / class_counts
+    sample_weights = [class_weights[label] for label in train_labels]
+
+    sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels), replacement=True)
+
+    train_loader = DataLoader(train_dataset, batch_size, sampler=sampler, num_workers=2)
     val_loader = DataLoader(val_dataset, batch_size, num_workers=2)
 
-    model = VisionTransformer(img_shape=224, patch_size=16, depth=12, hidden_dim=768, num_heads=12, mlp_dim=3072,num_classes=7)
+    model = VisionTransformer(img_shape=224, patch_size=16, depth=6, hidden_dim=256, num_heads=4, mlp_dim=512,num_classes=7)
 
     try:
-        train_model(model, train_loader, val_loader, train_labels, device)
+        train_model(model, train_loader, val_loader, device)
     except Exception as e:
         print(f"Training error: {e}")
 
