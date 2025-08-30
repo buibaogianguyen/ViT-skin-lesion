@@ -121,6 +121,9 @@ if __name__ == '__main__':
     #print("Train class distribution:", np.bincount(train_labels))
     #print("Val class distribution:", np.bincount(val_labels))
 
+    train_indices = train_dataset.indices
+    train_df = dataset.df.iloc[train_indices].copy()
+
     class_counts = np.bincount(train_labels)
     class_weights = 1.0 / class_counts
     sample_weights = [class_weights[label] for label in train_labels]
