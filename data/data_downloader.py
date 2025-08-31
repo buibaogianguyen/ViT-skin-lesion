@@ -1,7 +1,7 @@
 import kagglehub
 
 def download_dataset():
-    dataset_path = kagglehub.dataset_download("kmader/skin-cancer-mnist-ham10000")
+    dataset_path = kagglehub.dataset_download("andrewmvd/isic-2019")
     print(f"Dataset downloaded to: {dataset_path}")
 
     return dataset_path
@@ -11,4 +11,4 @@ if __name__ == "__main__":
         path = download_dataset()
     except Exception as e:
         print(f"Error downloading dataset: {e}")
-        print("Ensure you have ~3GB free disk space and an internet connection.")
+        print("Ensure you have ~10GB free disk space and an internet connection.")
