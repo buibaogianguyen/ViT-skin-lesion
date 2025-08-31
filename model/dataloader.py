@@ -24,7 +24,7 @@ class ISIC2019(Dataset):
         self.dataset_path = dataset_path
         self.transform = transform
 
-        self.img_dir = os.path.join(dataset_path, 'ISIC_2019_Training_Input')
+        self.img_dir = os.path.join(dataset_path, 'ISIC_2019_Training_Input', 'ISIC_2019_Training_Input')
 
         self.label_map = {'MEL': 0, 'NV': 1, 'BCC': 2, 'AK': 3, 'BKL': 4, 'DF': 5, 'VASC': 6, 'SCC': 7, 'UNK': 8}
 

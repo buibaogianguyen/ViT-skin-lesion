@@ -43,11 +43,11 @@ def load_metadata(db_session):
     
     metadata_df = pd.read_csv(metadata_path)
     groundtruth_df = pd.read_csv(groundtruth_path)
-    
-    if 'image_id' not in df.columns:
-        raise ValueError("Metadata CSV file is missing required column: image_id")
 
-    df = metadata_df.merge(groundtruth_df, left_on='image', right_on='image', how='inner') 
+    df = metadata_df.merge(groundtruth_df, left_on='image', right_on='image', how='inner')
+    
+    if 'image' not in df.columns:
+        raise ValueError("Metadata CSV file is missing required column: image") 
     
     label_columns = ['MEL', 'NV', 'BCC', 'AK', 'BKL', 'DF', 'VASC', 'SCC', 'UNK']
     df['label'] = df[label_columns].idxmax(axis=1).map({

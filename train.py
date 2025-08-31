@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from model.dataloader import HAM10000
+from model.dataloader import ISIC2019
 from data.data_manager import load_metadata, init_db
 from model.vit import VisionTransformer
 import os
@@ -27,10 +27,8 @@ def load_best_acc():
     return 0
 
 
-def train_model(model, train_loader, val_loader, device, class_weights, epochs=10, lr=0.0003):
-    class_weights = torch.tensor(class_weights, dtype=torch.float32).to(device)
-
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
+def train_model(model, train_loader, val_loader, device, epochs=10, lr=0.0003):
+    criterion = nn.CrossEntropyLoss()
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=0.05)
     
     model.to(device)
@@ -68,14 +66,18 @@ def train_model(model, train_loader, val_loader, device, class_weights, epochs=1
             save_best_acc(best_acc)
             torch.save(model.state_dict(), 'vit.pth')
     
-def validate(model, val_loader, device, class_weights):
+def validate(model, val_loader, device):
     model.eval()
 
     val_loss = 0
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
-
+    criterion = nn.CrossEntropyLoss()
+    
     correct = 0
     total = 0
+
+    num_classes = 9
+    class_correct = [0] * num_classes
+    class_total = [0] * num_classes
 
     with torch.no_grad():
         for images, labels in val_loader:
@@ -87,10 +89,21 @@ def validate(model, val_loader, device, class_weights):
             correct += (predicted==labels).sum().item()
             total += labels.size(0)
 
+            for i in range(len(labels)):
+                label = labels[i].item()
+                class_total[label] += 1
+                if predicted[i] == label:
+                    class_correct[label] += 1
+    
     avg_loss = val_loss / len(val_loader)
-    val_acc = (correct/total) * 100 if total > 0 else 0
+    val_acc = (correct / total) * 100 if total > 0 else 0
+
 
     print(f'Validation Loss: {avg_loss:.4f}\nValidation Accuracy: {val_acc:.4f}%')
+    for i in range(num_classes):
+        acc = 100.0 * class_correct[i] / class_total[i] if class_total[i] > 0 else 0
+        print(f'  Class {i}: {acc:.2f}% ({class_correct[i]}/{class_total[i]})')
+
     return val_acc
 
 def balance_training_data(train_df, data_aug_rate):
@@ -132,7 +145,7 @@ if __name__ == '__main__':
     session = init_db()
 
     dataset_path = load_metadata(session)
-    dataset = HAM10000(dataset_path=dataset_path, transform=transform)
+    dataset = ISIC2019(dataset_path=dataset_path, transform=transform)
 
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
@@ -144,34 +157,19 @@ if __name__ == '__main__':
     #print("Train class distribution:", np.bincount(train_labels))
     #print("Val class distribution:", np.bincount(val_labels))
 
-    train_indices = train_dataset.indices
-    train_df = dataset.df.iloc[train_indices].copy()
-
-    data_aug_rate = [5, 10, 15, 5, 50, 40, 1]
-
-    train_df_bal = balance_training_data(train_df, data_aug_rate)
-
-    train_dataset_bal = HAM10000(dataset_path, transform)
-    train_dataset_bal.df = train_df_bal.reset_index(drop=True)
-
-    train_labels_bal = train_df_bal['label_idx'].tolist()
-
-    val_df_bal = balance_val_data(dataset.df.iloc[val_dataset.indices])
-    val_dataset_bal = HAM10000(dataset_path, transform)
-    val_dataset_bal.df = val_df_bal.reset_index(drop=True)
-
-    class_counts = np.bincount(train_labels_bal)
+    class_counts = np.bincount(train_labels, minlength=9)
+    class_counts = np.where(class_counts == 0, 1, class_counts)
     class_weights = 1.0 / class_counts
-    class_weights = class_weights / class_weights.sum()
+    class_weights = torch.tensor(class_weights, dtype=torch.float32).to(device)
 
-    sample_weights = [class_weights[label] for label in train_labels_bal]
+    sample_weights = [class_weights[int(label)] for label in train_labels]
 
-    sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels_bal), replacement=True)
+    sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels), replacement=True)
 
-    train_loader = DataLoader(train_dataset_bal, batch_size, sampler=sampler, num_workers=2)
-    val_loader = DataLoader(val_dataset_bal, batch_size, num_workers=2)
+    train_loader = DataLoader(train_dataset, batch_size, sampler=sampler, num_workers=2)
+    val_loader = DataLoader(val_dataset, batch_size, shuffle=False, num_workers=2)
 
-    model = VisionTransformer(img_shape=224, patch_size=16, depth=6, hidden_dim=256, num_heads=8, mlp_dim=512,num_classes=7)
+    model = VisionTransformer(img_shape=224, patch_size=16, depth=6, hidden_dim=256, num_heads=8, mlp_dim=512,num_classes=9)
 
     try:
         train_model(model, train_loader, val_loader, device, class_weights)
