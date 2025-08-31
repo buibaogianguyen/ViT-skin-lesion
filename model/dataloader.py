@@ -25,10 +25,7 @@ class HAM10000(Dataset):
         self.df['label_idx'] = self.df['dx'].map(self.label_map)
 
         if self.df['label_idx'].isna().any():
-            raise ValueError("Null labels in metadata, recheck 'dx' column")
-
-        min_count = self.df['label_idx'].value_counts().min()
-        self.df = self.df.groupby('label_idx').apply(lambda x: x.sample(min_count, random_state=42)).reset_index(drop=True)
+             raise ValueError("Null labels in metadata, recheck 'dx' column")
         
     def __len__(self):
         return len(self.df)

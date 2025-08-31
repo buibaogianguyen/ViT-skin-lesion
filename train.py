@@ -11,6 +11,7 @@ import json
 import numpy as np
 from torch.utils.data import WeightedRandomSampler
 import pandas as pd
+import timm
 
 BEST_VAL_ACC_PATH = 'best_acc.json'
 
@@ -26,9 +27,10 @@ def load_best_acc():
     return 0
 
 
-def train_model(model, train_loader, val_loader, device, epochs=10, lr=0.0003):
+def train_model(model, train_loader, val_loader, device, class_weights, epochs=10, lr=0.0003):
+    class_weights = torch.tensor(class_weights, dtype=torch.float32).to(device)
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = optim.AdamW(model.parameters(), lr=lr)
     
     model.to(device)
@@ -59,18 +61,18 @@ def train_model(model, train_loader, val_loader, device, epochs=10, lr=0.0003):
             train_loss += loss.item()
 
         print(f'Epoch {epoch+1}\nAvg Train Loss: {train_loss/len(train_loader):.4f}')
-        val_acc = validate(model, val_loader, device)
+        val_acc = validate(model, val_loader, device, class_weights)
         if val_acc > best_acc:
             print(f'New best validation accuracy: {val_acc:.4f}% (previous: {best_acc:.4f}%)')
             best_acc = val_acc
             save_best_acc(best_acc)
             torch.save(model.state_dict(), 'vit.pth')
     
-def validate(model, val_loader, device):
+def validate(model, val_loader, device, class_weights):
     model.eval()
 
     val_loss = 0
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
 
     correct = 0
     total = 0
@@ -93,11 +95,22 @@ def validate(model, val_loader, device):
 
 def balance_training_data(train_df, data_aug_rate):
     balanced_dfs = []
+
     for class_idx, rate in enumerate(data_aug_rate):
         class_df = train_df[train_df['label_idx'] == class_idx]
         if len(class_df) > 0 and rate > 0:
             augmented_df = pd.concat([class_df] * rate, ignore_index=True)
             balanced_dfs.append(augmented_df)
+
+    return pd.concat(balanced_dfs, ignore_index=True)
+
+def balance_val_data(val_df):
+    min_count = val_df['label_idx'].value_counts().min()
+    balanced_dfs = []
+    for class_idx in val_df['label_idx'].unique():
+        class_df = val_df[val_df['label_idx'] == class_idx]
+        balanced_dfs.append(class_df.sample(min_count, random_state=42))
+        
     return pd.concat(balanced_dfs, ignore_index=True)
             
     
@@ -134,26 +147,30 @@ if __name__ == '__main__':
     train_indices = train_dataset.indices
     train_df = dataset.df.iloc[train_indices].copy()
 
-    data_aug_rate = [15, 10, 5, 50, 5, 1, 40]
+    data_aug_rate = [5, 10, 15, 5, 50, 40, 1]
 
     train_df_bal = balance_training_data(train_df, data_aug_rate)
 
     train_dataset_bal = HAM10000(dataset_path, transform)
-    train_dataset_bal.df = train_df_bal
+    train_dataset_bal.df = train_df_bal.reset_index(drop=True)
 
-    class_counts = np.bincount(train_labels)
+    train_labels_bal = train_df_bal['label_idx'].tolist()
+
+    class_counts = np.bincount(train_labels_bal)
     class_weights = 1.0 / class_counts
-    sample_weights = [class_weights[label] for label in train_labels]
+    class_weights = class_weights / class_weights.sum()
 
-    sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels), replacement=True)
+    sample_weights = [class_weights[label] for label in train_labels_bal]
 
-    train_loader = DataLoader(train_dataset_bal, batch_size, sampler=sampler, num_workers=2)
+    # sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels), replacement=True)
+
+    train_loader = DataLoader(train_dataset_bal, batch_size, num_workers=2)
     val_loader = DataLoader(val_dataset, batch_size, num_workers=2)
 
-    model = VisionTransformer(img_shape=224, patch_size=16, depth=6, hidden_dim=256, num_heads=4, mlp_dim=512,num_classes=7)
+    model = VisionTransformer(img_shape=224, patch_size=16, depth=12, hidden_dim=768, num_heads=12, mlp_dim=3072,num_classes=7)
 
     try:
-        train_model(model, train_loader, val_loader, device)
+        train_model(model, train_loader, val_loader, device, class_weights)
     except Exception as e:
         print(f"Training error: {e}")
 
