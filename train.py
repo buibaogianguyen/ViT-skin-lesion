@@ -31,7 +31,7 @@ def train_model(model, train_loader, val_loader, device, class_weights, epochs=1
     class_weights = torch.tensor(class_weights, dtype=torch.float32).to(device)
 
     criterion = nn.CrossEntropyLoss(weight=class_weights)
-    optimizer = optim.AdamW(model.parameters(), lr=lr)
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=0.05)
     
     model.to(device)
 
@@ -156,18 +156,22 @@ if __name__ == '__main__':
 
     train_labels_bal = train_df_bal['label_idx'].tolist()
 
+    val_df_bal = balance_val_data(dataset.df.iloc[val_dataset.indices])
+    val_dataset_bal = HAM10000(dataset_path, transform)
+    val_dataset_bal.df = val_df_bal.reset_index(drop=True)
+
     class_counts = np.bincount(train_labels_bal)
     class_weights = 1.0 / class_counts
     class_weights = class_weights / class_weights.sum()
 
     sample_weights = [class_weights[label] for label in train_labels_bal]
 
-    # sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels), replacement=True)
+    sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels_bal), replacement=True)
 
-    train_loader = DataLoader(train_dataset_bal, batch_size, num_workers=2)
-    val_loader = DataLoader(val_dataset, batch_size, num_workers=2)
+    train_loader = DataLoader(train_dataset_bal, batch_size, sampler=sampler, num_workers=2)
+    val_loader = DataLoader(val_dataset_bal, batch_size, num_workers=2)
 
-    model = VisionTransformer(img_shape=224, patch_size=16, depth=12, hidden_dim=768, num_heads=12, mlp_dim=3072,num_classes=7)
+    model = VisionTransformer(img_shape=224, patch_size=16, depth=6, hidden_dim=256, num_heads=8, mlp_dim=512,num_classes=7)
 
     try:
         train_model(model, train_loader, val_loader, device, class_weights)
