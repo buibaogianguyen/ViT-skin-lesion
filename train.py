@@ -10,6 +10,7 @@ import os
 import json
 import numpy as np
 from torch.utils.data import WeightedRandomSampler
+import pandas as pd
 
 BEST_VAL_ACC_PATH = 'best_acc.json'
 
@@ -89,6 +90,15 @@ def validate(model, val_loader, device):
 
     print(f'Validation Loss: {avg_loss:.4f}\nValidation Accuracy: {val_acc:.4f}%')
     return val_acc
+
+def balance_training_data(train_df, data_aug_rate):
+    balanced_dfs = []
+    for class_idx, rate in enumerate(data_aug_rate):
+        class_df = train_df[train_df['label_idx'] == class_idx]
+        if len(class_df) > 0 and rate > 0:
+            augmented_df = pd.concat([class_df] * rate, ignore_index=True)
+            balanced_dfs.append(augmented_df)
+    return pd.concat(balanced_dfs, ignore_index=True)
             
     
 if __name__ == '__main__':
@@ -124,13 +134,20 @@ if __name__ == '__main__':
     train_indices = train_dataset.indices
     train_df = dataset.df.iloc[train_indices].copy()
 
+    data_aug_rate = [15, 10, 5, 50, 5, 1, 40]
+
+    train_df_bal = balance_training_data(train_df, data_aug_rate)
+
+    train_dataset_bal = HAM10000(dataset_path, transform)
+    train_dataset_bal.df = train_df_bal
+
     class_counts = np.bincount(train_labels)
     class_weights = 1.0 / class_counts
     sample_weights = [class_weights[label] for label in train_labels]
 
     sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels), replacement=True)
 
-    train_loader = DataLoader(train_dataset, batch_size, sampler=sampler, num_workers=2)
+    train_loader = DataLoader(train_dataset_bal, batch_size, sampler=sampler, num_workers=2)
     val_loader = DataLoader(val_dataset, batch_size, num_workers=2)
 
     model = VisionTransformer(img_shape=224, patch_size=16, depth=6, hidden_dim=256, num_heads=4, mlp_dim=512,num_classes=7)
