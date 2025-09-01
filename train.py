@@ -27,7 +27,7 @@ def load_best_acc():
     return 0
 
 
-def train_model(model, train_loader, val_loader, device, epochs=10, lr=0.0003):
+def train_model(model, train_loader, val_loader, device, epochs=10, lr=0.0003, grad_clip=1.0):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=0.05)
     
@@ -54,12 +54,13 @@ def train_model(model, train_loader, val_loader, device, epochs=10, lr=0.0003):
 
             loss = criterion(outputs, labels)
             loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
             optimizer.step()
 
             train_loss += loss.item()
 
         print(f'Epoch {epoch+1}\nAvg Train Loss: {train_loss/len(train_loader):.4f}')
-        val_acc = validate(model, val_loader, device, class_weights)
+        val_acc = validate(model, val_loader, device)
         if val_acc > best_acc:
             print(f'New best validation accuracy: {val_acc:.4f}% (previous: {best_acc:.4f}%)')
             best_acc = val_acc
@@ -160,9 +161,9 @@ if __name__ == '__main__':
     class_counts = np.bincount(train_labels, minlength=9)
     class_counts = np.where(class_counts == 0, 1, class_counts)
     class_weights = 1.0 / class_counts
-    class_weights = torch.tensor(class_weights, dtype=torch.float32).to(device)
+    class_weights = torch.tensor(class_weights, dtype=torch.float32)
 
-    sample_weights = [class_weights[int(label)] for label in train_labels]
+    sample_weights = [class_weights[label] for label in train_labels]
 
     sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels), replacement=True)
 
@@ -172,7 +173,7 @@ if __name__ == '__main__':
     model = VisionTransformer(img_shape=224, patch_size=16, depth=6, hidden_dim=256, num_heads=8, mlp_dim=512,num_classes=9)
 
     try:
-        train_model(model, train_loader, val_loader, device, class_weights)
+        train_model(model, train_loader, val_loader, device)
     except Exception as e:
         print(f"Training error: {e}")
 
