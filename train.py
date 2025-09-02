@@ -177,7 +177,7 @@ if __name__ == '__main__':
 
     #sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels), replacement=True)
 
-    train_loader = DataLoader(balanced_train_dataset, batch_size, shuffle=True, num_workers=2)
+    train_loader = DataLoader(balanced_train_dataset, batch_size, shuffle=True, num_workers=2, drop_last=True)
     val_loader = DataLoader(val_dataset, batch_size, shuffle=False, num_workers=2)
 
     model = VisionTransformer(img_shape=224, patch_size=16, depth=6, hidden_dim=256, num_heads=8, mlp_dim=512,num_classes=9)
