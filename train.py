@@ -198,23 +198,23 @@ if __name__ == '__main__':
 
         model.cls_token.data.copy_(pretrained_model.cls_token)
 
-    for i, layer in enumerate(model.transformer):
-        pre_layer = pretrained_model.blocks[i]
+        for i, layer in enumerate(model.transformer):
+            pre_layer = pretrained_model.blocks[i]
 
-        layer['norm1'].weight.copy_(pre_layer.norm1.weight)
-        layer['norm1'].bias.copy_(pre_layer.norm1.bias)
-        layer['norm2'].weight.copy_(pre_layer.norm2.weight)
-        layer['norm2'].bias.copy_(pre_layer.norm2.bias)
+            layer['norm1'].weight.copy_(pre_layer.norm1.weight)
+            layer['norm1'].bias.copy_(pre_layer.norm1.bias)
+            layer['norm2'].weight.copy_(pre_layer.norm2.weight)
+            layer['norm2'].bias.copy_(pre_layer.norm2.bias)
 
-        layer['attn'].in_proj_weight.copy_(pre_layer.attn.qkv.weight)
-        layer['attn'].in_proj_bias.copy_(pre_layer.attn.qkv.bias)
-        layer['attn'].out_proj.weight.copy_(pre_layer.attn.proj.weight)
-        layer['attn'].out_proj.bias.copy_(pre_layer.attn.proj.bias)
+            layer['attn'].in_proj_weight.copy_(pre_layer.attn.qkv.weight)
+            layer['attn'].in_proj_bias.copy_(pre_layer.attn.qkv.bias)
+            layer['attn'].out_proj.weight.copy_(pre_layer.attn.proj.weight)
+            layer['attn'].out_proj.bias.copy_(pre_layer.attn.proj.bias)
 
-        layer['mlp'][0].weight.copy_(pre_layer.mlp.fc1.weight)
-        layer['mlp'][0].bias.copy_(pre_layer.mlp.fc1.bias)
-        layer['mlp'][2].weight.copy_(pre_layer.mlp.fc2.weight)
-        layer['mlp'][2].bias.copy_(pre_layer.mlp.fc2.bias)
+            layer['mlp'][0].weight.copy_(pre_layer.mlp.fc1.weight)
+            layer['mlp'][0].bias.copy_(pre_layer.mlp.fc1.bias)
+            layer['mlp'][2].weight.copy_(pre_layer.mlp.fc2.weight)
+            layer['mlp'][2].bias.copy_(pre_layer.mlp.fc2.bias)
 
     try:
         train_model(model, train_loader, val_loader, device, class_weights, epochs=30)
