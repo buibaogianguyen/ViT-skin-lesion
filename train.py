@@ -11,9 +11,11 @@ import json
 import numpy as np
 from torch.utils.data import WeightedRandomSampler
 import pandas as pd
+import timm
 from timm.data.mixup import Mixup
 from timm.loss import SoftTargetCrossEntropy
 from torch.utils.data import Subset
+import torch.nn.functional as F
 
 BEST_VAL_ACC_PATH = 'best_acc.json'
 
@@ -121,6 +123,20 @@ def balance_training_data(train_df, data_aug_rate):
             balanced_dfs.append(augmented_df)
 
     return pd.concat(balanced_dfs, ignore_index=True)
+
+def resize_pos_embed(pretrained_pos_embed, new_num_patches, hidden_dim):
+    cls_token = pretrained_pos_embed[:, 0:1, :]
+    patch_pos_embed = pretrained_pos_embed[:, 1:, :]
+
+    old_num_patches = patch_pos_embed.shape[1]
+    old_size = int(old_num_patches ** 0.5)
+    new_size = int(new_num_patches ** 0.5)
+
+    patch_pos_embed = patch_pos_embed.reshape(1, old_size, old_size, hidden_dim).permute(0, 3, 1, 2)
+    patch_pos_embed = F.interpolate(patch_pos_embed, size=(new_size, new_size), mode='bilinear')
+    patch_pos_embed = patch_pos_embed.permute(0, 2, 3, 1).reshape(1, new_num_patches, hidden_dim)
+
+    return torch.cat([cls_token, patch_pos_embed], dim=1)
     
 if __name__ == '__main__':
     transform = transforms.Compose([
@@ -139,7 +155,7 @@ if __name__ == '__main__':
     num_classes=9
     )
 
-    batch_size = 32
+    batch_size = 48
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -177,10 +193,17 @@ if __name__ == '__main__':
 
     #sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels), replacement=True)
 
-    train_loader = DataLoader(balanced_train_dataset, batch_size, shuffle=True, num_workers=2, drop_last=True)
-    val_loader = DataLoader(val_dataset, batch_size, shuffle=False, num_workers=2)
+    train_loader = DataLoader(balanced_train_dataset, batch_size, shuffle=True, num_workers=4, drop_last=True)
+    val_loader = DataLoader(val_dataset, batch_size, shuffle=False, num_workers=4)
 
-    model = VisionTransformer(img_shape=224, patch_size=16, depth=6, hidden_dim=256, num_heads=8, mlp_dim=512,num_classes=9)
+    model = VisionTransformer(img_shape=224, patch_size=16, depth=12, hidden_dim=768, num_heads=12, mlp_dim=512,num_classes=9)
+
+    pretrained_model = timm.create_model('vit_base_patch16_224', pretrained=True)
+    model.pos_embed.data = resize_pos_embed(pretrained_model.pos_embed, new_num_patches=(224//16)**2, hidden_dim=768)
+
+    model.patch_embed.weight.data = pretrained_model.patch_embed.proj.weight.data
+    model.patch_embed.bias.data = pretrained_model.patch_embed.proj.bias.data
+
 
     try:
         train_model(model, train_loader, val_loader, device, mixup_fn, class_weights)
