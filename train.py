@@ -29,7 +29,7 @@ def load_best_acc():
     return 0
 
 
-def train_model(model, train_loader, val_loader, device, class_weights, epochs=10, lr=0.0001, grad_clip=1.0):
+def train_model(model, train_loader, val_loader, device, class_weights, epochs=30, lr=0.0001, grad_clip=1.0):
     criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=0.05)
     
@@ -120,19 +120,19 @@ def validate(model, val_loader, device):
 
   #  return pd.concat(balanced_dfs, ignore_index=True)
 
-def resize_pos_embed(pretrained_pos_embed, new_num_patches, hidden_dim):
-    cls_token = pretrained_pos_embed[:, 0:1, :]
-    patch_pos_embed = pretrained_pos_embed[:, 1:, :]
+#def resize_pos_embed(pretrained_pos_embed, new_num_patches, hidden_dim):
+    #cls_token = pretrained_pos_embed[:, 0:1, :]
+    #patch_pos_embed = pretrained_pos_embed[:, 1:, :]
 
-    old_num_patches = patch_pos_embed.shape[1]
-    old_size = int(old_num_patches ** 0.5)
-    new_size = int(new_num_patches ** 0.5)
+    #old_num_patches = patch_pos_embed.shape[1]
+    #old_size = int(old_num_patches ** 0.5)
+    #new_size = int(new_num_patches ** 0.5)
 
-    patch_pos_embed = patch_pos_embed.reshape(1, old_size, old_size, hidden_dim).permute(0, 3, 1, 2)
-    patch_pos_embed = F.interpolate(patch_pos_embed, size=(new_size, new_size), mode='bilinear')
-    patch_pos_embed = patch_pos_embed.permute(0, 2, 3, 1).reshape(1, new_num_patches, hidden_dim)
+    #patch_pos_embed = patch_pos_embed.reshape(1, old_size, old_size, hidden_dim).permute(0, 3, 1, 2)
+    #patch_pos_embed = F.interpolate(patch_pos_embed, size=(new_size, new_size), mode='bilinear')
+    #patch_pos_embed = patch_pos_embed.permute(0, 2, 3, 1).reshape(1, new_num_patches, hidden_dim)
 
-    return torch.cat([cls_token, patch_pos_embed], dim=1)
+    #return torch.cat([cls_token, patch_pos_embed], dim=1)
     
 if __name__ == '__main__':
     transform = transforms.Compose([
@@ -186,19 +186,38 @@ if __name__ == '__main__':
     train_loader = DataLoader(train_dataset, batch_size, sampler=sampler, num_workers=4, drop_last=True)
     val_loader = DataLoader(val_dataset, batch_size, shuffle=False, num_workers=4)
 
-    model = VisionTransformer(img_shape=224, patch_size=16, depth=12, hidden_dim=768, num_heads=12, mlp_dim=512,num_classes=9)
+    model = VisionTransformer(img_shape=224, patch_size=16, depth=12, hidden_dim=768, num_heads=12, mlp_dim=3072,num_classes=9)
 
     pretrained_model = timm.create_model('vit_base_patch16_224', pretrained=True)
-    model.pos_embed.data = resize_pos_embed(pretrained_model.pos_embed, new_num_patches=(224//16)**2, hidden_dim=768)
-
+    
     with torch.no_grad():
-        conv_w = pretrained_model.patch_embed.proj.weight.flatten(1)
-        model.patch_embed.weight.copy_(conv_w)
+        model.patch_embed.weight.copy_(pretrained_model.patch_embed.proj.weight)
         model.patch_embed.bias.copy_(pretrained_model.patch_embed.proj.bias)
 
+        model.pos_embed.data.copy_(pretrained_model.pos_embed)
+
+        model.cls_token.data.copy_(pretrained_model.cls_token)
+
+    for i, layer in enumerate(model.transformer):
+        pre_layer = pretrained_model.blocks[i]
+
+        layer['norm1'].weight.copy_(pre_layer.norm1.weight)
+        layer['norm1'].bias.copy_(pre_layer.norm1.bias)
+        layer['norm2'].weight.copy_(pre_layer.norm2.weight)
+        layer['norm2'].bias.copy_(pre_layer.norm2.bias)
+
+        layer['attn'].in_proj_weight.copy_(pre_layer.attn.qkv.weight)
+        layer['attn'].in_proj_bias.copy_(pre_layer.attn.qkv.bias)
+        layer['attn'].out_proj.weight.copy_(pre_layer.attn.proj.weight)
+        layer['attn'].out_proj.bias.copy_(pre_layer.attn.proj.bias)
+
+        layer['mlp'][0].weight.copy_(pre_layer.mlp.fc1.weight)
+        layer['mlp'][0].bias.copy_(pre_layer.mlp.fc1.bias)
+        layer['mlp'][2].weight.copy_(pre_layer.mlp.fc2.weight)
+        layer['mlp'][2].bias.copy_(pre_layer.mlp.fc2.bias)
 
     try:
-        train_model(model, train_loader, val_loader, device, class_weights)
+        train_model(model, train_loader, val_loader, device, class_weights, epochs=30)
     except Exception as e:
         print(f"Training error: {e}")
 

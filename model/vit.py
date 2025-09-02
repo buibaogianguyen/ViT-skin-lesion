@@ -11,7 +11,7 @@ class VisionTransformer(nn.Module):
         num_patches = (img_shape // patch_size) ** 2
         patch_dim = 3 * patch_size * patch_size # rgb*ps*ps
 
-        self.patch_embed = nn.Linear(patch_dim, hidden_dim)
+        self.patch_embed = nn.Conv2d(3, hidden_dim, kernel_size=patch_size, stride=patch_size)
         self.cls_token = nn.Parameter(torch.randn(1,1,hidden_dim))
         self.pos_embed = nn.Parameter(torch.randn(1,num_patches+1,hidden_dim))
 
@@ -44,12 +44,10 @@ class VisionTransformer(nn.Module):
                     nn.init.zeros_(m.bias)
 
     def forward(self, x):
-        ps  = self.patch_size
-
         B = x.shape[0]
-        x = x.unfold(2,ps,ps).unfold(3,ps,ps)
-        x = x.permute(0, 2, 3, 1, 4, 5).reshape(B, -1, ps*ps*3)
+
         x = self.patch_embed(x)
+        x = x.flatten(2).transpose(1, 2)
 
         cls_tokens = self.cls_token.expand(B, -1, -1)
 
