@@ -31,7 +31,8 @@ def load_best_acc():
 
 def train_model(model, train_loader, val_loader, device, class_weights, epochs=30, lr=0.0001, grad_clip=1.0):
     criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
-    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=0.05)
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
     
     model.to(device)
 
@@ -68,6 +69,8 @@ def train_model(model, train_loader, val_loader, device, class_weights, epochs=3
             best_acc = val_acc
             save_best_acc(best_acc)
             torch.save(model.state_dict(), 'vit.pth')
+
+        scheduler.step()
     
 def validate(model, val_loader, device):
     model.eval()
@@ -136,11 +139,11 @@ def validate(model, val_loader, device):
     
 if __name__ == '__main__':
     transform = transforms.Compose([
-        transforms.Resize((224,224)),
-        transforms.RandomHorizontalFlip(p=0.25),
-        transforms.RandomVerticalFlip(p=0.25),
+        transforms.Resize(224, scale=(0.8,1)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
         transforms.RandomRotation(10),
-        transforms.ColorJitter(0.1, 0.1, 0.1, 0.02),
+        transforms.ColorJitter(0.15, 0.15, 0.15, 0.03),
         transforms.ToTensor(),
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     ])
