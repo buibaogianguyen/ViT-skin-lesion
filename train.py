@@ -11,7 +11,9 @@ import json
 import numpy as np
 from torch.utils.data import WeightedRandomSampler
 import pandas as pd
-import timm
+from timm.data.mixup import Mixup
+from timm.loss import SoftTargetCrossEntropy
+from torch.utils.data import Subset
 
 BEST_VAL_ACC_PATH = 'best_acc.json'
 
@@ -27,8 +29,8 @@ def load_best_acc():
     return 0
 
 
-def train_model(model, train_loader, val_loader, device, epochs=10, lr=0.0003, grad_clip=1.0):
-    criterion = nn.CrossEntropyLoss()
+def train_model(model, train_loader, val_loader, device, mixup_fn, class_weights, epochs=10, lr=0.0001, grad_clip=1.0):
+    criterion = SoftTargetCrossEntropy()
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=0.05)
     
     model.to(device)
@@ -47,6 +49,8 @@ def train_model(model, train_loader, val_loader, device, epochs=10, lr=0.0003, g
         
         for (images, labels) in train_loader:
             images, labels = images.to(device), labels.to(device)
+
+            images, labels = mixup_fn(images, labels)
 
             optimizer.zero_grad()
 
@@ -117,16 +121,6 @@ def balance_training_data(train_df, data_aug_rate):
             balanced_dfs.append(augmented_df)
 
     return pd.concat(balanced_dfs, ignore_index=True)
-
-def balance_val_data(val_df):
-    min_count = val_df['label_idx'].value_counts().min()
-    balanced_dfs = []
-    for class_idx in val_df['label_idx'].unique():
-        class_df = val_df[val_df['label_idx'] == class_idx]
-        balanced_dfs.append(class_df.sample(min_count, random_state=42))
-        
-    return pd.concat(balanced_dfs, ignore_index=True)
-            
     
 if __name__ == '__main__':
     transform = transforms.Compose([
@@ -138,6 +132,12 @@ if __name__ == '__main__':
         transforms.ToTensor(),
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     ])
+
+    mixup_fn = Mixup(
+    mixup_alpha=0.2, cutmix_alpha=1.0,
+    prob=0.5, switch_prob=0.5,
+    num_classes=9
+    )
 
     batch_size = 32
 
@@ -153,7 +153,17 @@ if __name__ == '__main__':
 
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
-    train_labels = [label for _, label in train_dataset]
+    train_indices = train_dataset.indices
+    train_df = dataset.df.iloc[train_indices].copy()
+    train_df['orig_idx'] = train_df.index
+
+    data_aug_rate = [3, 1, 4, 10, 4, 25, 30, 15, 1]
+
+    balanced_train_df = balance_training_data(train_df, data_aug_rate)
+    balanced_indices = balanced_train_df['orig_idx'].tolist()
+    balanced_train_dataset = Subset(dataset, balanced_indices)
+
+    train_labels = [label.item() for _, label in balanced_train_dataset]
     val_labels = [label for _, label in val_dataset]
     #print("Train class distribution:", np.bincount(train_labels))
     #print("Val class distribution:", np.bincount(val_labels))
@@ -163,17 +173,17 @@ if __name__ == '__main__':
     class_weights = 1.0 / class_counts
     class_weights = torch.tensor(class_weights, dtype=torch.float32)
 
-    sample_weights = [class_weights[label] for label in train_labels]
+    #sample_weights = [class_weights[label] for label in train_labels]
 
-    sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels), replacement=True)
+    #sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels), replacement=True)
 
-    train_loader = DataLoader(train_dataset, batch_size, sampler=sampler, num_workers=2)
+    train_loader = DataLoader(balanced_train_dataset, batch_size, shuffle=True, num_workers=2)
     val_loader = DataLoader(val_dataset, batch_size, shuffle=False, num_workers=2)
 
     model = VisionTransformer(img_shape=224, patch_size=16, depth=6, hidden_dim=256, num_heads=8, mlp_dim=512,num_classes=9)
 
     try:
-        train_model(model, train_loader, val_loader, device)
+        train_model(model, train_loader, val_loader, device, mixup_fn, class_weights)
     except Exception as e:
         print(f"Training error: {e}")
 
