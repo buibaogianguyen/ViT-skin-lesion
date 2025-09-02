@@ -139,7 +139,7 @@ def validate(model, val_loader, device):
     
 if __name__ == '__main__':
     transform = transforms.Compose([
-        transforms.Resize(224, scale=(0.8,1)),
+        transforms.RandomResizedCrop(224, scale=(0.8,1)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
         transforms.RandomRotation(10),
