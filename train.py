@@ -12,8 +12,6 @@ import numpy as np
 from torch.utils.data import WeightedRandomSampler
 import pandas as pd
 import timm
-from timm.data.mixup import Mixup
-from timm.loss import SoftTargetCrossEntropy
 from torch.utils.data import Subset
 import torch.nn.functional as F
 
@@ -31,8 +29,8 @@ def load_best_acc():
     return 0
 
 
-def train_model(model, train_loader, val_loader, device, mixup_fn, class_weights, epochs=10, lr=0.0001, grad_clip=1.0):
-    criterion = SoftTargetCrossEntropy()
+def train_model(model, train_loader, val_loader, device, class_weights, epochs=10, lr=0.0001, grad_clip=1.0):
+    criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=0.05)
     
     model.to(device)
@@ -50,10 +48,6 @@ def train_model(model, train_loader, val_loader, device, mixup_fn, class_weights
         train_loss = 0
         
         for (images, labels) in train_loader:
-            labels = F.one_hot(labels, num_classes=9).float()
-
-            images, labels = mixup_fn(images, labels)
-
             images, labels = images.to(device), labels.to(device)
 
             optimizer.zero_grad()
@@ -151,12 +145,6 @@ if __name__ == '__main__':
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     ])
 
-    mixup_fn = Mixup(
-    mixup_alpha=0.2, cutmix_alpha=1.0,
-    prob=0.5, switch_prob=0.5,
-    num_classes=9
-    )
-
     batch_size = 48
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -208,7 +196,7 @@ if __name__ == '__main__':
 
 
     try:
-        train_model(model, train_loader, val_loader, device, mixup_fn, class_weights)
+        train_model(model, train_loader, val_loader, device, class_weights)
     except Exception as e:
         print(f"Training error: {e}")
 
