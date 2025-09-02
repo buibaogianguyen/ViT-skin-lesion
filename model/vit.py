@@ -18,7 +18,7 @@ class VisionTransformer(nn.Module):
         self.transformer = nn.ModuleList([
             nn.ModuleDict({
                 'norm1': nn.LayerNorm(hidden_dim),
-                'attn': nn.MultiheadAttention(hidden_dim, num_heads=num_heads, batch_first=True),               'norm1': nn.LayerNorm(hidden_dim),
+                'attn': nn.MultiheadAttention(hidden_dim, num_heads=num_heads, batch_first=True),
                 'mlp':  nn.Sequential(
                     nn.Linear(hidden_dim, mlp_dim),
                     nn.GELU(),
