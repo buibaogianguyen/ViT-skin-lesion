@@ -109,16 +109,16 @@ def validate(model, val_loader, device):
 
     return val_acc
 
-def balance_training_data(train_df, data_aug_rate):
-    balanced_dfs = []
+#def balance_training_data(train_df, data_aug_rate):
+   # balanced_dfs = []
 
-    for class_idx, rate in enumerate(data_aug_rate):
-        class_df = train_df[train_df['label_idx'] == class_idx]
-        if len(class_df) > 0 and rate > 0:
-            augmented_df = pd.concat([class_df] * rate, ignore_index=True)
-            balanced_dfs.append(augmented_df)
+    #for class_idx, rate in enumerate(data_aug_rate):
+        #class_df = train_df[train_df['label_idx'] == class_idx]
+      #  if len(class_df) > 0 and rate > 0:
+       #     augmented_df = pd.concat([class_df] * rate, ignore_index=True)
+      #      balanced_dfs.append(augmented_df)
 
-    return pd.concat(balanced_dfs, ignore_index=True)
+  #  return pd.concat(balanced_dfs, ignore_index=True)
 
 def resize_pos_embed(pretrained_pos_embed, new_num_patches, hidden_dim):
     cls_token = pretrained_pos_embed[:, 0:1, :]
@@ -165,11 +165,11 @@ if __name__ == '__main__':
 
     data_aug_rate = [3, 1, 4, 10, 4, 25, 30, 15, 1]
 
-    balanced_train_df = balance_training_data(train_df, data_aug_rate)
-    balanced_indices = balanced_train_df['orig_idx'].tolist()
-    balanced_train_dataset = Subset(dataset, balanced_indices)
+    #balanced_train_df = balance_training_data(train_df, data_aug_rate)
+    #balanced_indices = balanced_train_df['orig_idx'].tolist()
+    #balanced_train_dataset = Subset(dataset, balanced_indices)
 
-    train_labels = [label.item() for _, label in balanced_train_dataset]
+    train_labels = [label.item() for _, label in train_dataset]
     val_labels = [label for _, label in val_dataset]
     #print("Train class distribution:", np.bincount(train_labels))
     #print("Val class distribution:", np.bincount(val_labels))
@@ -179,11 +179,11 @@ if __name__ == '__main__':
     class_weights = 1.0 / class_counts
     class_weights = torch.tensor(class_weights, dtype=torch.float32)
 
-    #sample_weights = [class_weights[label] for label in train_labels]
+    sample_weights = [class_weights[label] for label in train_labels]
 
-    #sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels), replacement=True)
+    sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels), replacement=True)
 
-    train_loader = DataLoader(balanced_train_dataset, batch_size, shuffle=True, num_workers=4, drop_last=True)
+    train_loader = DataLoader(train_dataset, batch_size, sampler=sampler, num_workers=4, drop_last=True)
     val_loader = DataLoader(val_dataset, batch_size, shuffle=False, num_workers=4)
 
     model = VisionTransformer(img_shape=224, patch_size=16, depth=12, hidden_dim=768, num_heads=12, mlp_dim=512,num_classes=9)
@@ -191,8 +191,10 @@ if __name__ == '__main__':
     pretrained_model = timm.create_model('vit_base_patch16_224', pretrained=True)
     model.pos_embed.data = resize_pos_embed(pretrained_model.pos_embed, new_num_patches=(224//16)**2, hidden_dim=768)
 
-    model.patch_embed.weight.data = pretrained_model.patch_embed.proj.weight.data
-    model.patch_embed.bias.data = pretrained_model.patch_embed.proj.bias.data
+    with torch.no_grad():
+        conv_w = pretrained_model.patch_embed.proj.weight.flatten(1)
+        model.patch_embed.weight.copy_(conv_w)
+        model.patch_embed.bias.copy_(pretrained_model.patch_embed.proj.bias)
 
 
     try:
