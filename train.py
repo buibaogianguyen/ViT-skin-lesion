@@ -50,9 +50,11 @@ def train_model(model, train_loader, val_loader, device, mixup_fn, class_weights
         train_loss = 0
         
         for (images, labels) in train_loader:
-            images, labels = images.to(device), labels.to(device)
+            labels = F.one_hot(labels, num_classes=9).float()
 
             images, labels = mixup_fn(images, labels)
+
+            images, labels = images.to(device), labels.to(device)
 
             optimizer.zero_grad()
 
