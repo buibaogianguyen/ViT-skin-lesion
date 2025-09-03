@@ -3,6 +3,7 @@ import os
 from PIL import Image
 from torchvision import transforms
 from model.vit import VisionTransformer
+from database_storing import store_to_db
 
 def infer(model, img_path, transform, device):
     if not os.path.exists(img_path):
@@ -38,6 +39,7 @@ if __name__ == '__main__':
     model.to(device)
     
     image_path = "C:/Users/buiba/Downloads/ISIC_0000000.jpg"
+    image_id = os.path.splitext(os.path.basename(image_path))[0]
 
     try:
         probs = infer(model, image_path, transform, device)
@@ -45,5 +47,8 @@ if __name__ == '__main__':
         print("Probabilities:")
         for i, prob in enumerate(probs):
             print(f"{label_map[i]}: {prob:.4f}")
+            
+        store_to_db(image_id, probs)
+
     except Exception as e:
         print(f"Inference error: {e}")
