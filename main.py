@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from data.data_manager import SkinLesion, init_db
+from sqlalchemy import func
+from fastapi.responses import HTMLResponse
 
 app = FastAPI()
 
@@ -9,6 +11,17 @@ def get_db():
         yield db_session
     finally:
         db_session.close()
+
+@app.get("/stats")
+
+def stats():
+    db = next(get_db())
+    total = db.query(SkinLesion).count()
+    per_label = dict(db.query(SkinLesion.label, func.count()).group_by(SkinLesion.label).all())
+    avg_age = db.query(func.avg(SkinLesion.age)).scalar()
+
+    return {"total": total, "per_label": per_label, "avg_age": avg_age}
+        
 
 @app.get('/lesion/{image_id}')
 
