@@ -1,6 +1,4 @@
-from fastapi import FastAPI, Depends
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from fastapi import FastAPI
 from data.data_manager import SkinLesion, init_db
 
 app = FastAPI()
