@@ -25,10 +25,14 @@ This model is a Vision Transformer deep-learning architecture proposed in the 20
 # Requirements
 
 ```bash
-torch>=2.0.0
-torchvision>=0.15.0
-numpy>=1.24.0
-tqdm>=4.65.0
+fastapi>=0.70.0
+uvicorn>=0.15.0
+sqlalchemy>=1.4.0
+pandas>=1.3.0
+torch>=1.9.0
+torchvision>=0.10.0
+Pillow>=8.3.0
+kagglehub>=0.1.15
 ```
 
 - See `requirements.txt` for a full list of dependencies.
