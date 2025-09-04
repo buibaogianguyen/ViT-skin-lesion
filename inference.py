@@ -38,7 +38,7 @@ if __name__ == '__main__':
     
     model.to(device)
     
-    image_path = "C:/Users/buiba/Downloads/test.jpg"
+    image_path = ""
     image_id = os.path.splitext(os.path.basename(image_path))[0]
 
     try:
