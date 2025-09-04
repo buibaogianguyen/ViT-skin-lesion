@@ -119,7 +119,7 @@ No formal web UI is currently included with the API but will be added in the fut
 
 ## Database
 
-The file skin_lesions.db is saved automatically when running train.py, any new inference runs testing an image with the same file name as images from ISIC-2019 will update existing image data in the probabilities section of the database, this records probabilities predicted by the model for each class. New images will be added, not updated. 
+The file skin_lesions.db is saved automatically when running train.py by SQLAlchemy, any new inference runs testing an image with the same file name as images from ISIC-2019 will update existing image data in the probabilities section of the database, this records probabilities predicted by the model for each class. New images will be added, not updated. 
 
 .db file may be ran in external applications or software, such as [SQLite](https://sqlite.org/).
 
