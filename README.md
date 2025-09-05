@@ -1,6 +1,11 @@
 # Vision Transformer for Skin Lesion predictions/classification
 
-This project implements a PyTorch-based Vision Transformer (ViT) model trained on the [ISIC-2019 Dataset](https://www.kaggle.com/datasets/andrewmvd/isic-2019), which has 25,331 dermoscopic images for melanoma prediction/classification. This model utilizes transfer learning, loading weights from "vit_base_patch16_224" from the timm library, which was trained on the ImageNet dataset. This allowed the model to reach 83% validation accuracy after 27 epochs on a highly imbalanced dataset. Running train.py will initialize a database file using SQLAlchemy for ease in querying and downstream analysis. The model also integrates FastAPI, although no UI currently exist.
+This project implements a PyTorch-based Vision Transformer (ViT) model trained on the [ISIC-2019 Dataset](https://www.kaggle.com/datasets/andrewmvd/isic-2019), which has 25,331 dermoscopic images for melanoma prediction/classification. This model utilizes transfer learning, loading weights from "vit_base_patch16_224" from the timm library, which was trained on the ImageNet dataset. This allowed the model to reach 83% validation accuracy after 27 epochs on a highly imbalanced dataset.
+
+
+Running train.py will initialize a database file using SQLAlchemy for ease in querying and downstream analysis. The model also includes a FastAPI backend (UI coming soon).
+
+
 
 # Navigation
 - [Research Paper - An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale](#research-paper)
