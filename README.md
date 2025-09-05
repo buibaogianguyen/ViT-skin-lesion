@@ -104,7 +104,7 @@ python inference.py
 ```
 Remember to include the image path of the image you want to test at Line 41 between the quotation marks.
 ```python
-image_path = ""
+image_path = "{file-path-here}"
 ```
 
 ## API run
